@@ -6,14 +6,16 @@
                 "${workspaceFolder}/**",
                 "D:\\Qt\\6.11.0\\mingw_64\\include\\QtCore",
                 "D:\\Qt\\6.11.0\\mingw_64\\include\\QtWidgets",
-                "D:\\Qt\\6.11.0\\mingw_64\\include"
+                "D:\\Qt\\6.11.0\\mingw_64\\include",
+                "D:\\Qt\\6.11.0\\mingw_64\\include\\QtGui"
             ],
             "defines": [
                 "_DEBUG",
                 "UNICODE",
                 "_UNICODE",
                 "QT_CORE_LIB",
-                "QT_WIDGETS_LIB"
+                "QT_WIDGETS_LIB",
+                "QT_GUI_LIB"
             ],
             "compilerPath": "D:\\GCC\\mingw64\\bin\\gcc.exe",
             "cStandard": "c17",
