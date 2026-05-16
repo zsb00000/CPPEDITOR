@@ -2,3 +2,6 @@ struct.md
 *.exe
 *.out
 *.in
+.qtcreator/
+qtcreator/
+build/
