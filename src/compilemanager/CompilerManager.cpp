@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QProcess>
@@ -16,7 +17,11 @@ static const QString ADDR_BROADCAST = QStringLiteral("*"); // 默认广播地址
 
 CompilerManager::CompilerManager(QObject *parent) : QObject(parent) {}
 
-CompilerManager::~CompilerManager() = default;
+CompilerManager::~CompilerManager()
+{
+    killCompileProcess();
+    killRunProcess();
+}
 
 // ---------- 工具函数 ----------
 QJsonObject CompilerManager::makeResponse(const QString &process,
@@ -228,4 +233,229 @@ QJsonObject CompilerManager::manage()
     // TODO: 待后续实现（如多编译器切换、高级设置）
     return makeResponse(PROCESS_NAME, "info", ADDR_BROADCAST,
                         "manage() not implemented yet.");
+}
+
+// ========== 异步 API 实现 ==========
+
+QJsonObject CompilerManager::compileAsync(const QString &sourceFile,
+                                          const QString &outputFile,
+                                          const QStringList &extraFlags)
+{
+    if (m_compilerPath.isEmpty())
+    {
+        return makeResponse(PROCESS_NAME, "error", ADDR_BROADCAST,
+                            "No compiler configured. Use setcompile first.");
+    }
+
+    // 若已有编译在跑，先停止
+    killCompileProcess();
+
+    // 确定输出文件名
+    QString out = outputFile;
+    if (out.isEmpty())
+    {
+        QFileInfo fi(sourceFile);
+        out = fi.absolutePath() + "/" + fi.completeBaseName();
+#ifdef Q_OS_WIN
+        out += ".exe";
+#endif
+    }
+    m_lastOutputPath = out;
+
+    // 拼接参数
+    QStringList arguments;
+    arguments << sourceFile;
+    arguments << "-o" << out;
+    arguments << m_defaultFlags;
+    arguments << extraFlags;
+
+    m_compileProcess = new QProcess(this);
+
+    connect(m_compileProcess,
+            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+            &CompilerManager::onCompileFinished);
+    connect(m_compileProcess, &QProcess::readyReadStandardOutput, this,
+            &CompilerManager::onCompileReadyRead);
+    connect(m_compileProcess, &QProcess::readyReadStandardError, this,
+            &CompilerManager::onCompileReadyRead);
+
+    m_compileProcess->start(m_compilerPath, arguments);
+    emit compilationStarted(sourceFile);
+
+    return makeResponse(PROCESS_NAME, "success", ADDR_BROADCAST,
+                        "Compilation started asynchronously.");
+}
+
+QJsonObject CompilerManager::runAsync(const QString &executablePath,
+                                      const QStringList &args)
+{
+    QFileInfo fi(executablePath);
+    if (!fi.exists() || !fi.isExecutable())
+    {
+        return makeResponse(PROCESS_NAME, "error", ADDR_BROADCAST,
+                            "Executable not found: " + executablePath);
+    }
+
+    killRunProcess();
+
+    m_runProcess = new QProcess(this);
+    m_runProcess->setProcessChannelMode(QProcess::MergedChannels);
+
+    connect(m_runProcess,
+            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+            &CompilerManager::onRunFinished);
+    connect(m_runProcess, &QProcess::readyRead, this,
+            &CompilerManager::onRunReadyRead);
+
+    m_runProcess->setProgram(executablePath);
+    m_runProcess->setArguments(args);
+    m_runProcess->start();
+
+    emit programStarted(executablePath);
+
+    return makeResponse(PROCESS_NAME, "success", ADDR_BROADCAST,
+                        "Program started asynchronously.");
+}
+
+QJsonObject CompilerManager::compileAndRun(const QString &sourceFile,
+                                           const QStringList &extraFlags)
+{
+    if (m_compilerPath.isEmpty())
+    {
+        return makeResponse(PROCESS_NAME, "error", ADDR_BROADCAST,
+                            "No compiler configured.");
+    }
+
+    // 先异步编译，编译成功后在信号槽中自动运行
+    // 保存待运行的 exe 信息（compileAsync 会设置 m_lastOutputPath）
+    QJsonObject result = compileAsync(sourceFile, QString(), extraFlags);
+    m_pendingRunExe = m_lastOutputPath;
+    return result;
+}
+
+QJsonObject CompilerManager::stop()
+{
+    killCompileProcess();
+    killRunProcess();
+    m_pendingRunExe.clear();
+    return makeResponse(PROCESS_NAME, "success", ADDR_BROADCAST,
+                        "All processes stopped.");
+}
+
+QString CompilerManager::lastOutputPath() const { return m_lastOutputPath; }
+
+// ────────── 私有槽 ──────────
+
+void CompilerManager::onCompileFinished(int exitCode,
+                                        QProcess::ExitStatus status)
+{
+    Q_UNUSED(status)
+    QString stdOut, stdErr;
+    if (m_compileProcess)
+    {
+        stdOut =
+            QString::fromLocal8Bit(m_compileProcess->readAllStandardOutput());
+        stdErr =
+            QString::fromLocal8Bit(m_compileProcess->readAllStandardError());
+    }
+
+    QString error;
+    QString outputPath = m_lastOutputPath;
+    bool success = (exitCode == 0);
+
+    if (!success)
+    {
+        error = stdErr;
+        if (error.isEmpty())
+            error = stdOut;
+        if (error.isEmpty())
+            error =
+                QString("Compilation failed with exit code %1").arg(exitCode);
+    }
+
+    // 若 compileAndRun 触发且编译成功 → 自动运行
+    if (success && !m_pendingRunExe.isEmpty())
+    {
+        QString exe = m_pendingRunExe;
+        m_pendingRunExe.clear();
+        emit compilationFinished(true, outputPath, QString());
+        runAsync(exe);
+    }
+    else
+    {
+        m_pendingRunExe.clear();
+        emit compilationFinished(success, outputPath, error);
+    }
+
+    killCompileProcess();
+}
+
+void CompilerManager::onCompileReadyRead()
+{
+    if (!m_compileProcess)
+        return;
+    QString out =
+        QString::fromLocal8Bit(m_compileProcess->readAllStandardOutput());
+    QString err =
+        QString::fromLocal8Bit(m_compileProcess->readAllStandardError());
+
+    QStringList lines;
+    if (!out.isEmpty())
+        lines.append(out.split('\n', Qt::SkipEmptyParts));
+    if (!err.isEmpty())
+        lines.append(err.split('\n', Qt::SkipEmptyParts));
+
+    for (const QString &line : lines)
+        emit compilationOutput(line);
+}
+
+void CompilerManager::onRunFinished(int exitCode, QProcess::ExitStatus status)
+{
+    Q_UNUSED(status)
+    // 读取剩余输出
+    if (m_runProcess)
+    {
+        QString remaining = QString::fromLocal8Bit(m_runProcess->readAll());
+        if (!remaining.isEmpty())
+            emit programOutput(remaining);
+    }
+    emit programFinished(exitCode);
+    killRunProcess();
+}
+
+void CompilerManager::onRunReadyRead()
+{
+    if (!m_runProcess)
+        return;
+    QString data = QString::fromLocal8Bit(m_runProcess->readAll());
+    if (!data.isEmpty())
+        emit programOutput(data);
+}
+
+void CompilerManager::killCompileProcess()
+{
+    if (m_compileProcess)
+    {
+        if (m_compileProcess->state() != QProcess::NotRunning)
+        {
+            m_compileProcess->kill();
+            m_compileProcess->waitForFinished(2000);
+        }
+        m_compileProcess->deleteLater();
+        m_compileProcess = nullptr;
+    }
+}
+
+void CompilerManager::killRunProcess()
+{
+    if (m_runProcess)
+    {
+        if (m_runProcess->state() != QProcess::NotRunning)
+        {
+            m_runProcess->kill();
+            m_runProcess->waitForFinished(2000);
+        }
+        m_runProcess->deleteLater();
+        m_runProcess = nullptr;
+    }
 }
