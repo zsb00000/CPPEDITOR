@@ -328,6 +328,139 @@ void DebuggerManager::handleAddBreakpoint(const QString &location)
     sendToGdb("-break-insert " + location);
 }
 
+// ------ 高层调试 API 实现 ------
+QJsonObject DebuggerManager::startDebug(const QString &executablePath)
+{
+    QJsonObject result;
+    if (!QFileInfo::exists(executablePath))
+    {
+        result["success"] = false;
+        result["error"] = "可执行文件不存在: " + executablePath;
+        return result;
+    }
+
+    if (!m_gdbProcess || m_gdbProcess->state() != QProcess::Running)
+    {
+        startGdb();
+        if (!m_gdbProcess || m_gdbProcess->state() != QProcess::Running)
+        {
+            result["success"] = false;
+            result["error"] = "无法启动 GDB";
+            return result;
+        }
+    }
+
+    // 加载可执行文件并启动
+    sendToGdb("-file-exec-and-symbols " + executablePath);
+    sendToGdb("-break-insert main");
+    sendToGdb("-exec-run");
+
+    m_currentExecutable = executablePath;
+    result["success"] = true;
+    result["executable"] = executablePath;
+    return result;
+}
+
+QJsonObject DebuggerManager::stopDebug()
+{
+    QJsonObject result;
+    if (m_gdbProcess && m_gdbProcess->state() == QProcess::Running)
+    {
+        sendToGdb("-gdb-exit");
+        result["success"] = true;
+    }
+    else
+    {
+        result["success"] = false;
+        result["error"] = "GDB 未运行";
+    }
+    m_currentExecutable.clear();
+    return result;
+}
+
+QJsonObject DebuggerManager::toggleBreakpoint(const QString &filePath, int line)
+{
+    QJsonObject result;
+    QString location = QString("%1:%2").arg(filePath).arg(line);
+
+    // 检查是否已存在断点
+    for (const auto &bp : m_breakpoints)
+    {
+        if (bp.file == filePath && bp.line == line)
+        {
+            // 已有断点 → 删除
+            sendToGdb(QString("-break-delete %1").arg(bp.number));
+            result["success"] = true;
+            result["action"] = "deleted";
+            result["location"] = location;
+            return result;
+        }
+    }
+
+    // 无断点 → 添加
+    sendToGdb("-break-insert " + location);
+    result["success"] = true;
+    result["action"] = "added";
+    result["location"] = location;
+    return result;
+}
+
+QJsonObject DebuggerManager::stepOver()
+{
+    QJsonObject result;
+    if (!m_isRunning)
+    {
+        result["success"] = false;
+        result["error"] = "程序未在运行";
+        return result;
+    }
+    sendToGdb("-exec-next");
+    result["success"] = true;
+    return result;
+}
+
+QJsonObject DebuggerManager::stepInto()
+{
+    QJsonObject result;
+    if (!m_isRunning)
+    {
+        result["success"] = false;
+        result["error"] = "程序未在运行";
+        return result;
+    }
+    sendToGdb("-exec-step");
+    result["success"] = true;
+    return result;
+}
+
+QJsonObject DebuggerManager::stepOut()
+{
+    QJsonObject result;
+    if (!m_isRunning)
+    {
+        result["success"] = false;
+        result["error"] = "程序未在运行";
+        return result;
+    }
+    sendToGdb("-exec-finish");
+    result["success"] = true;
+    return result;
+}
+
+QJsonObject DebuggerManager::continueExec()
+{
+    QJsonObject result;
+    if (!m_isRunning)
+    {
+        result["success"] = false;
+        result["error"] = "程序未在运行";
+        return result;
+    }
+    sendToGdb("-exec-continue");
+    result["success"] = true;
+    return result;
+}
+
 // ------ GDB 输出解析 (recv) ------
 void DebuggerManager::recv()
 {

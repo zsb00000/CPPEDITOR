@@ -1,0 +1,177 @@
+/* CPPEditor Default Theme - Light */
+/* ==================================== */
+
+/* ---- 全局 ---- */
+QMainWindow {
+    background-color: #f5f5f5;
+}
+
+QMenuBar {
+    background-color: #e8e8e8;
+    border-bottom: 1px solid #ccc;
+    padding: 2px 0;
+}
+
+QMenuBar::item:selected {
+    background-color: #d0d0d0;
+    border-radius: 3px;
+}
+
+QMenu {
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    padding: 4px 0;
+}
+
+QMenu::item {
+    padding: 4px 24px;
+}
+
+QMenu::item:selected {
+    background-color: #0078d4;
+    color: white;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: #ddd;
+    margin: 4px 8px;
+}
+
+/* ---- 工具栏 ---- */
+QToolBar {
+    background-color: #e8e8e8;
+    border-bottom: 1px solid #ccc;
+    spacing: 4px;
+    padding: 4px;
+}
+
+/* ---- 标签页 ---- */
+QTabWidget::pane {
+    border: 1px solid #ccc;
+    background-color: #ffffff;
+}
+
+QTabBar::tab {
+    background-color: #e0e0e0;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    padding: 6px 16px;
+    margin-right: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+QTabBar::tab:selected {
+    background-color: #ffffff;
+    border-bottom: 2px solid #0078d4;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #d5d5d5;
+}
+
+/* ---- 状态栏 ---- */
+QStatusBar {
+    background-color: #e8e8e8;
+    border-top: 1px solid #ccc;
+    padding: 2px;
+}
+
+/* ---- 代码编辑器区域 ---- */
+QPlainTextEdit {
+    background-color: #ffffff;
+    color: #1e1e1e;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 13px;
+    border: none;
+    selection-background-color: #add6ff;
+    selection-color: #1e1e1e;
+}
+
+/* ---- 文件树 ---- */
+QTreeView {
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    alternate-background-color: #f8f8f8;
+}
+
+QTreeView::item:selected {
+    background-color: #0078d4;
+    color: white;
+}
+
+/* ---- 输出面板 ---- */
+QTextEdit, QPlainTextEdit {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+}
+
+/* ---- 按钮 ---- */
+QPushButton {
+    background-color: #e0e0e0;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    padding: 6px 14px;
+    min-width: 60px;
+}
+
+QPushButton:hover {
+    background-color: #d0d0d0;
+}
+
+QPushButton:pressed {
+    background-color: #c0c0c0;
+}
+
+/* ---- 行输入 ---- */
+QLineEdit {
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    padding: 4px 8px;
+    background-color: #fff;
+}
+
+QLineEdit:focus {
+    border-color: #0078d4;
+}
+
+/* ---- 分隔条 ---- */
+QSplitter::handle {
+    background-color: #ccc;
+    width: 2px;
+    height: 2px;
+}
+
+/* ---- 滚动条 ---- */
+QScrollBar:vertical {
+    background: #f0f0f0;
+    width: 12px;
+    border: none;
+}
+
+QScrollBar::handle:vertical {
+    background: #c0c0c0;
+    border-radius: 6px;
+    min-height: 20px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #a0a0a0;
+}
+
+QScrollBar:horizontal {
+    background: #f0f0f0;
+    height: 12px;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background: #c0c0c0;
+    border-radius: 6px;
+    min-width: 20px;
+    margin: 2px;
+}

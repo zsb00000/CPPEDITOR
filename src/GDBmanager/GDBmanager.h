@@ -3,6 +3,7 @@
 #include <QAction>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QObject>
@@ -109,6 +110,15 @@ class DebuggerManager : public QObject
     void initial(const QString &gdbPath);
     void setup();
 
+    // 高层调试 API（供 ActionManager 调用）
+    QJsonObject startDebug(const QString &executablePath);
+    QJsonObject stopDebug();
+    QJsonObject toggleBreakpoint(const QString &filePath, int line);
+    QJsonObject stepOver();
+    QJsonObject stepInto();
+    QJsonObject stepOut();
+    QJsonObject continueExec();
+
   public slots:
     void trans(const QString &command);
 
@@ -154,6 +164,7 @@ class DebuggerManager : public QObject
     QList<Breakpoint> m_breakpoints;
     QList<Variable> m_currentLocals;
     QList<StackFrame> m_currentStack;
+    QString m_currentExecutable;
     bool m_isRunning = false;
     // 用于记录异步命令的token（简化起见，可不用）
 };
